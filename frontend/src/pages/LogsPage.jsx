@@ -1,0 +1,167 @@
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+
+import api from "../services/api";
+import { authStore } from "../store/authStore";
+
+export default function LogsPage() {
+  const navigate = useNavigate();
+  const role = authStore((state) => state.role);
+  const username = authStore((state) => state.username);
+  const signOut = authStore((state) => state.signOut);
+
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [downloadingFile, setDownloadingFile] = useState("");
+  const [linkLoadingFile, setLinkLoadingFile] = useState("");
+  const [presignedLinks, setPresignedLinks] = useState({});
+
+  useEffect(() => {
+    let active = true;
+
+    const fetchLogs = async () => {
+      try {
+        setLoading(true);
+        const response = await api.get("/logs");
+        if (active) {
+          setLogs(response.data);
+          setError("");
+        }
+      } catch (err) {
+        if (!active) return;
+
+        if (err?.response?.status === 401) {
+          signOut();
+          navigate("/login", { replace: true });
+          return;
+        }
+
+        setError("Nao foi possivel carregar os logs.");
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchLogs();
+
+    return () => {
+      active = false;
+    };
+  }, [navigate, signOut]);
+
+  const handleLogout = () => {
+    signOut();
+    navigate("/login", { replace: true });
+  };
+
+  const handleDownload = async (fileName) => {
+    try {
+      setDownloadingFile(fileName);
+      const response = await api.get(`/logs/${encodeURIComponent(fileName)}`, {
+        responseType: "blob",
+      });
+
+      const url = URL.createObjectURL(response.data);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      if (err?.response?.status === 403) {
+        setError("Seu perfil nao possui permissao para download.");
+        return;
+      }
+      setError("Falha ao baixar arquivo.");
+    } finally {
+      setDownloadingFile("");
+    }
+  };
+
+  const handlePresignedLink = async (fileName) => {
+    try {
+      setLinkLoadingFile(fileName);
+      setError("");
+      const response = await api.post(`/logs/${encodeURIComponent(fileName)}/presigned`);
+      setPresignedLinks((current) => ({ ...current, [fileName]: response.data.url }));
+    } catch (err) {
+      if (err?.response?.status === 403) {
+        setError("Seu perfil nao possui permissao para gerar link temporario.");
+        return;
+      }
+      setError("Falha ao gerar link temporario.");
+    } finally {
+      setLinkLoadingFile("");
+    }
+  };
+
+  return (
+    <main className="page page-logs">
+      <section className="atmosphere" aria-hidden="true" />
+      <section className="panel reveal-delay">
+        <header className="topbar">
+          <div>
+            <p className="kicker">Authenticated Area</p>
+            <h1>Logs Bucket View</h1>
+          </div>
+          <div className="identity">
+            <span>{username || "usuario"}</span>
+            <strong>{role || "viewer"}</strong>
+            <button className="ghost" onClick={handleLogout}>
+              Sair
+            </button>
+          </div>
+        </header>
+
+        {error && <p className="error inline">{error}</p>}
+
+        {loading ? (
+          <p className="muted">Carregando arquivos...</p>
+        ) : (
+          <ul className="log-list">
+            {logs.map((item) => (
+              <li key={item.name}>
+                <div>
+                  <strong>{item.name}</strong>
+                  <span>{item.size} bytes</span>
+                  {presignedLinks[item.name] && (
+                    <a
+                      className="link-inline"
+                      href={presignedLinks[item.name]}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Abrir link temporario
+                    </a>
+                  )}
+                </div>
+                <div className="actions">
+                  <button
+                    onClick={() => handleDownload(item.name)}
+                    disabled={role !== "admin" || downloadingFile === item.name}
+                  >
+                    {downloadingFile === item.name ? "Baixando..." : "Download"}
+                  </button>
+                  <button
+                    className="ghost"
+                    onClick={() => handlePresignedLink(item.name)}
+                    disabled={role !== "admin" || linkLoadingFile === item.name}
+                  >
+                    {linkLoadingFile === item.name ? "Gerando..." : "Link temporario"}
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {role !== "admin" && (
+          <p className="muted">Perfil viewer: voce pode listar os logs, mas nao baixar.</p>
+        )}
+      </section>
+    </main>
+  );
+}
