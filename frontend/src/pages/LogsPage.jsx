@@ -16,6 +16,7 @@ export default function LogsPage() {
   const [downloadingFile, setDownloadingFile] = useState("");
   const [linkLoadingFile, setLinkLoadingFile] = useState("");
   const [presignedLinks, setPresignedLinks] = useState({});
+  const [expiresSeconds, setExpiresSeconds] = useState(300);
 
   useEffect(() => {
     let active = true;
@@ -85,7 +86,9 @@ export default function LogsPage() {
     try {
       setLinkLoadingFile(fileName);
       setError("");
-      const response = await api.post(`/logs/${encodeURIComponent(fileName)}/presigned`);
+      const response = await api.post(`/logs/${encodeURIComponent(fileName)}/presigned`, null, {
+        params: { expires_seconds: expiresSeconds },
+      });
       setPresignedLinks((current) => ({ ...current, [fileName]: response.data.url }));
     } catch (err) {
       if (err?.response?.status === 403) {
@@ -98,6 +101,20 @@ export default function LogsPage() {
     }
   };
 
+  const handleCopyLink = async (fileName) => {
+    const url = presignedLinks[fileName];
+    if (!url) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(url);
+      setError("");
+    } catch {
+      setError("Nao foi possivel copiar o link.");
+    }
+  };
+
   return (
     <main className="page page-logs">
       <section className="atmosphere" aria-hidden="true" />
@@ -107,12 +124,27 @@ export default function LogsPage() {
             <p className="kicker">Authenticated Area</p>
             <h1>Logs Bucket View</h1>
           </div>
-          <div className="identity">
-            <span>{username || "usuario"}</span>
-            <strong>{role || "viewer"}</strong>
-            <button className="ghost" onClick={handleLogout}>
-              Sair
-            </button>
+          <div className="toolbar">
+            <label className="expires-field">
+              Expiracao
+              <select
+                value={expiresSeconds}
+                onChange={(event) => setExpiresSeconds(Number(event.target.value))}
+                disabled={role !== "admin"}
+              >
+                <option value={60}>1 min</option>
+                <option value={300}>5 min</option>
+                <option value={900}>15 min</option>
+                <option value={3600}>60 min</option>
+              </select>
+            </label>
+            <div className="identity">
+              <span>{username || "usuario"}</span>
+              <strong>{role || "viewer"}</strong>
+              <button className="ghost" onClick={handleLogout}>
+                Sair
+              </button>
+            </div>
           </div>
         </header>
 
@@ -128,14 +160,19 @@ export default function LogsPage() {
                   <strong>{item.name}</strong>
                   <span>{item.size} bytes</span>
                   {presignedLinks[item.name] && (
-                    <a
-                      className="link-inline"
-                      href={presignedLinks[item.name]}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Abrir link temporario
-                    </a>
+                    <div className="link-group">
+                      <a
+                        className="link-inline"
+                        href={presignedLinks[item.name]}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Abrir link temporario
+                      </a>
+                      <button className="ghost tiny" onClick={() => handleCopyLink(item.name)}>
+                        Copiar link
+                      </button>
+                    </div>
                   )}
                 </div>
                 <div className="actions">

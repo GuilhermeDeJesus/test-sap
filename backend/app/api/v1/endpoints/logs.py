@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 
 from app.api.dependencies import get_cloud_provider, get_current_user, require_admin
@@ -33,11 +33,16 @@ def download_log(file_name: str, user=Depends(require_admin), provider=Depends(g
 
 
 @router.post("/{file_name}/presigned", response_model=PresignedResponse)
-def presigned_url(file_name: str, user=Depends(require_admin), provider=Depends(get_cloud_provider)):
+def presigned_url(
+    file_name: str,
+    expires_seconds: int = Query(default=300, ge=60, le=3600),
+    user=Depends(require_admin),
+    provider=Depends(get_cloud_provider),
+):
     _ = user
     service = LogService(provider)
     try:
-        url = service.create_presigned(file_name)
+        url = service.create_presigned(file_name, expires_seconds=expires_seconds)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail="File not found") from exc
     return PresignedResponse(url=url)
