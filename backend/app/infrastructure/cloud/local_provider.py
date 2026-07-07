@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from app.core.config import get_settings
+from app.core.security import create_temporary_download_token
 from app.infrastructure.cloud.base import CloudLogObject, CloudStorageProvider
 
 
@@ -23,5 +24,5 @@ class LocalLogProvider(CloudStorageProvider):
         return target.read_bytes()
 
     def generate_presigned_download_url(self, file_name: str, expires_seconds: int = 300) -> str:
-        # Local environment cannot produce true presigned URLs.
-        return f"/logs/{file_name}?expires_in={expires_seconds}"
+        token = create_temporary_download_token(file_name=file_name, expires_seconds=expires_seconds)
+        return f"/logs/public-download?token={token}"

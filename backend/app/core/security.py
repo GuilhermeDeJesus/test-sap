@@ -36,3 +36,27 @@ def decode_token(token: str) -> dict[str, Any]:
         return payload
     except JWTError as exc:
         raise ValueError("Invalid token") from exc
+
+
+def create_temporary_download_token(file_name: str, expires_seconds: int) -> str:
+    settings = get_settings()
+    expire = datetime.now(timezone.utc) + timedelta(seconds=expires_seconds)
+    payload: dict[str, Any] = {
+        "type": "download",
+        "file": file_name,
+        "exp": expire,
+    }
+    return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+
+
+def decode_temporary_download_token(token: str) -> dict[str, Any]:
+    settings = get_settings()
+    try:
+        payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
+    except JWTError as exc:
+        raise ValueError("Invalid temporary token") from exc
+
+    if payload.get("type") != "download":
+        raise ValueError("Invalid temporary token")
+
+    return payload

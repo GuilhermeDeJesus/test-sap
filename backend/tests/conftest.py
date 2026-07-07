@@ -7,6 +7,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.api.dependencies import get_cloud_provider, get_db
 from app.bootstrap import seed_users
+from app.core.rate_limit import login_rate_limiter
 from app.infrastructure.database.database import Base
 from app.infrastructure.cloud.local_provider import LocalLogProvider
 from app.main import app
@@ -14,6 +15,8 @@ from app.main import app
 
 @pytest.fixture()
 def client(tmp_path: Path):
+    login_rate_limiter._events.clear()
+
     db_file = tmp_path / "test.db"
     engine = create_engine(f"sqlite:///{db_file}", connect_args={"check_same_thread": False})
     TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

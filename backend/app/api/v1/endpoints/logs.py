@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 
 from app.api.dependencies import get_cloud_provider, get_current_user, require_admin
+from app.core.security import decode_temporary_download_token
 from app.domain.services.log_service import LogService
 from app.schemas.logs import LogFileResponse, PresignedResponse
 
@@ -14,22 +15,6 @@ def list_logs(user=Depends(get_current_user), provider=Depends(get_cloud_provide
     service = LogService(provider)
     logs = service.list_logs()
     return [LogFileResponse(name=log.name, size=log.size) for log in logs]
-
-
-@router.get("/{file_name}")
-def download_log(file_name: str, user=Depends(require_admin), provider=Depends(get_cloud_provider)):
-    _ = user
-    service = LogService(provider)
-    try:
-        content = service.download(file_name)
-    except FileNotFoundError as exc:
-        raise HTTPException(status_code=404, detail="File not found") from exc
-
-    return Response(
-        content=content,
-        media_type="text/plain",
-        headers={"Content-Disposition": f'attachment; filename="{file_name}"'},
-    )
 
 
 @router.post("/{file_name}/presigned", response_model=PresignedResponse)
@@ -46,3 +31,43 @@ def presigned_url(
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail="File not found") from exc
     return PresignedResponse(url=url)
+
+
+@router.get("/public-download")
+def public_download(token: str = Query(...), provider=Depends(get_cloud_provider)):
+    try:
+        payload = decode_temporary_download_token(token)
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail="Invalid or expired temporary link") from exc
+
+    file_name = payload.get("file")
+    if not file_name:
+        raise HTTPException(status_code=401, detail="Invalid or expired temporary link")
+
+    service = LogService(provider)
+    try:
+        content = service.download(file_name)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="File not found") from exc
+
+    return Response(
+        content=content,
+        media_type="text/plain",
+        headers={"Content-Disposition": f'attachment; filename="{file_name}"'},
+    )
+
+
+@router.get("/{file_name}")
+def download_log(file_name: str, user=Depends(require_admin), provider=Depends(get_cloud_provider)):
+    _ = user
+    service = LogService(provider)
+    try:
+        content = service.download(file_name)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="File not found") from exc
+
+    return Response(
+        content=content,
+        media_type="text/plain",
+        headers={"Content-Disposition": f'attachment; filename="{file_name}"'},
+    )
