@@ -1,3 +1,6 @@
+from urllib.parse import urlparse
+
+
 def _token_for(client, username: str, password: str) -> str:
     response = client.post("/auth/login", json={"username": username, "password": password})
     return response.json()["access_token"]
@@ -37,7 +40,7 @@ def test_admin_generates_public_temporary_link(client):
     )
     assert response.status_code == 200
     url = response.json()["url"]
-    assert "/logs/public-download?token=" in url
+    assert url.startswith("http://testserver/logs/public-download?token=")
 
 
 def test_public_temporary_link_downloads_without_auth(client):
@@ -48,7 +51,8 @@ def test_public_temporary_link_downloads_without_auth(client):
         headers={"Authorization": f"Bearer {token}"},
     )
     public_url = response.json()["url"]
-    download = client.get(public_url)
+    parsed = urlparse(public_url)
+    download = client.get(f"{parsed.path}?{parsed.query}")
 
     assert download.status_code == 200
     assert b"access line" in download.content
