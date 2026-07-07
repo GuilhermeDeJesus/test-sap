@@ -63,7 +63,7 @@ pytest -q
 
 Saída esperada:
 ```text
-6 passed
+8 passed
 ```
 
 ## Executar com Docker
@@ -162,4 +162,3 @@ curl -X POST http://localhost:8000/logs/access.log/presigned \
 - Migrar rate limiter para Redis em ambiente distribuído
 - Adicionar trilha de auditoria para downloads (IP, user-agent, request-id)
 - Incluir CI (pytest + lint)
-# test-sap
