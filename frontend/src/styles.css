@@ -227,6 +227,7 @@ button.ghost {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .link-inline {
@@ -239,6 +240,17 @@ button.ghost {
 button.tiny {
   padding: 6px 10px;
   font-size: 0.78rem;
+}
+
+.link-meta {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.copied-state {
+  font-size: 0.75rem;
+  color: #2f7c3f;
+  font-weight: 700;
 }
 
 .log-list strong {

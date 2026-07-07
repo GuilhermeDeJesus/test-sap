@@ -16,6 +16,8 @@ export default function LogsPage() {
   const [downloadingFile, setDownloadingFile] = useState("");
   const [linkLoadingFile, setLinkLoadingFile] = useState("");
   const [presignedLinks, setPresignedLinks] = useState({});
+  const [presignedMeta, setPresignedMeta] = useState({});
+  const [copiedByFile, setCopiedByFile] = useState({});
   const [expiresSeconds, setExpiresSeconds] = useState(300);
 
   useEffect(() => {
@@ -90,6 +92,14 @@ export default function LogsPage() {
         params: { expires_seconds: expiresSeconds },
       });
       setPresignedLinks((current) => ({ ...current, [fileName]: response.data.url }));
+      setPresignedMeta((current) => ({
+        ...current,
+        [fileName]: {
+          expiresSeconds,
+          generatedAt: Date.now(),
+        },
+      }));
+      setCopiedByFile((current) => ({ ...current, [fileName]: false }));
     } catch (err) {
       if (err?.response?.status === 403) {
         setError("Seu perfil nao possui permissao para gerar link temporario.");
@@ -110,9 +120,22 @@ export default function LogsPage() {
     try {
       await navigator.clipboard.writeText(url);
       setError("");
+      setCopiedByFile((current) => ({ ...current, [fileName]: true }));
+      setTimeout(() => {
+        setCopiedByFile((current) => ({ ...current, [fileName]: false }));
+      }, 1500);
     } catch {
       setError("Nao foi possivel copiar o link.");
     }
+  };
+
+  const formatExpiryLabel = (fileName) => {
+    const meta = presignedMeta[fileName];
+    if (!meta?.expiresSeconds) {
+      return "";
+    }
+    const minutes = Math.round(meta.expiresSeconds / 60);
+    return `Expira em ${minutes} min`;
   };
 
   return (
@@ -172,6 +195,8 @@ export default function LogsPage() {
                       <button className="ghost tiny" onClick={() => handleCopyLink(item.name)}>
                         Copiar link
                       </button>
+                      <span className="link-meta">{formatExpiryLabel(item.name)}</span>
+                      {copiedByFile[item.name] && <span className="copied-state">Copiado</span>}
                     </div>
                   )}
                 </div>
